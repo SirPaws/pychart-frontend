@@ -30,7 +30,7 @@ class ThemeProvider implements Data {
 
     ThemeData get material             => isDarkMode ? Themes.materialDark   : Themes.materialLight;
     TabbedViewThemeData get tabbedView => isDarkMode ? Themes.tabbedViewDark : Themes.tabbedViewLight; 
-    CodeTheme get code                 => isDarkMode ? Themes.codeDracula    : CodeTheme();
+    CodeTheme get code                 => isDarkMode ? Themes.codeDracula    : Themes.codeLight;
 }
 
 class CodeTheme {
@@ -51,13 +51,13 @@ class CodeTheme {
         Color? stringEscape
         })  
         :
-        keyword      = keyword      ?? const Color(0xFFFF79C6),
-        types        = types        ?? const Color(0xFF8be9fd),
-        comments     = comments     ?? const Color(0xFF6272A4),
-        foreground   = foreground   ?? const Color(0xFF282A36),
-        background   = background   ?? const Color(0xFFF8F8F2),
-        string       = string       ?? const Color(0xFFF1FA8C),
-        stringEscape = stringEscape ?? const Color(0xFFFF5555);
+        keyword      = keyword      ?? const Color(0xFF000000),
+        types        = types        ?? const Color(0xFF000000),
+        comments     = comments     ?? const Color(0xFF000000),
+        foreground   = foreground   ?? const Color(0xFF000000),
+        background   = background   ?? const Color(0xFF000000),
+        string       = string       ?? const Color(0xFF000000),
+        stringEscape = stringEscape ?? const Color(0xFF000000);
 }
 
 class Themes {
@@ -76,6 +76,16 @@ class Themes {
         foreground  : const Color(0xFFF8F8F2),
         background  : const Color(0xFF282A36),
         string      : const Color(0xFFF1FA8C),
+        stringEscape: const Color(0xFFFF5555)
+    );
+    
+    static final codeLight = CodeTheme(
+        keyword     : const Color(0xFFFF79C6),
+        types       : const Color(0xFF8B7DFD),
+        comments    : const Color(0xFF49567A),
+        foreground  : const Color(0xFFF8F8F2),
+        background  : const Color(0xFF282A36),
+        string      : const Color(0xFF53B061),
         stringEscape: const Color(0xFFFF5555)
     );
 

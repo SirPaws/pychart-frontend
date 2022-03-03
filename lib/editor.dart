@@ -116,7 +116,6 @@ class EditorState extends State<EditorWidget> {
                                 text: controller.text.replaceRange(max(cursorPos, 0), max(cursorPos, 0), insert),
                                 selection: TextSelection.fromPosition(TextPosition(offset: max(cursorPos, 0) + insert.length))
                             );
-
                         })
                 },
                 child: TextField(
