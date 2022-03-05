@@ -25,6 +25,31 @@ class HighlightCodeController extends TextEditingController {
         patternMap = patterns ?? {},
         super();
 
+    void updateColors({
+        CodeTheme? theme,
+        Map<String, HighlightData>? strings,
+        Map<RegExp, HighlightData>? patterns})
+    {
+        if (theme != null) {
+            foreground = theme.foreground;
+            background = theme.background;
+        }
+
+        if (strings != null) {
+            final keys = strings.keys;
+            for (final key in keys) {
+                stringMap[key] = strings[key]!;
+            }
+        }
+
+        if (patterns != null) {
+            final keys = patterns.keys;
+            for (final key in keys) {
+                patternMap[key] = patterns[key]!;
+            }
+        }
+    }
+
     @override
     TextSpan buildTextSpan({
         required BuildContext context,

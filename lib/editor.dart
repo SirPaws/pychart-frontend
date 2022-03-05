@@ -7,41 +7,46 @@ import 'main.dart';
 import 'data.dart';
 import 'highlighted_code.dart';
 import 'themeprovider.dart';
-import 'variant.dart';
-
 
 class EditorData implements Data {
     HighlightCodeController? _controller;
     HighlightCodeController _getController() { 
-        CodeTheme theme = ThemeProvider.provider.code;
-        _controller ??= HighlightCodeController(
-            theme: theme,
-            strings: {
-                'if'  : HighlightData(TextStyle(color: theme.keyword)),
-                'else': HighlightData(TextStyle(color: theme.keyword)),
-                'var' : HighlightData(TextStyle(color: theme.types)),
-            },
-            patterns: {
-                RegExp(r'//.*'): HighlightData(TextStyle(color: ThemeProvider.provider.code.comments)),
-                RegExp(r'".*"'): HighlightData((String str){
-                    List<TextSpan> children = [];
-                    final stringEscape = RegExp(r'\\(x[[:alnum:]]{1,2}|[0-7]{1,3}|u[[:alnum:]]{4}|U[[:alnum:]]{8}|.)');
-                    str.splitMapJoin(stringEscape,
-                        onNonMatch: (String span) {
-                            children.add(TextSpan(text: span, style: TextStyle(color: theme.string)));
-                            return span.toString();
-                        },
-                        onMatch: (Match m) {
-                            children.add(TextSpan(text: m[0], style: TextStyle(color: theme.stringEscape)));
-                            return '';
-                        }
-                    );
-                    return TextSpan(style: TextStyle(color: theme.string), children: children);
-                }),
-            }
-        );
+        final theme = ThemeProvider.provider.code;
+        final strings = {
+            'if'  : HighlightData(TextStyle(color: theme.keyword)),
+            'else': HighlightData(TextStyle(color: theme.keyword)),
+            'let' : HighlightData(TextStyle(color: theme.types)),
+        };
+
+        final patterns = {
+            // comments
+            RegExp(r'//.*'): HighlightData(TextStyle(color: ThemeProvider.provider.code.comments)),
+            // strings, with ansi escapes
+            RegExp(r'".*"'): HighlightData((String str){
+                List<TextSpan> children = [];
+                // this regex is based of, of C's escape sequences
+                // https://en.cppreference.com/w/c/language/escape
+                final stringEscape = RegExp(r'\\(x[[:alnum:]]{1,2}|[0-7]{1,3}|u[[:alnum:]]{4}|U[[:alnum:]]{8}|.)');
+                str.splitMapJoin(stringEscape,
+                    onNonMatch: (String span) {
+                        children.add(TextSpan(text: span, style: TextStyle(color: theme.string)));
+                        return span.toString();
+                    },
+                    onMatch: (Match m) {
+                        children.add(TextSpan(text: m[0], style: TextStyle(color: theme.stringEscape)));
+                        return '';
+                    }
+                );
+                return TextSpan(style: TextStyle(color: theme.string), children: children);
+            }),
+        };
+
+        _controller ??= HighlightCodeController();
+        _controller?.updateColors(theme: theme, strings: strings, patterns: patterns);
+
         return _controller!;
     }
+
     HighlightCodeController get controller => _getController();
 
     @override
