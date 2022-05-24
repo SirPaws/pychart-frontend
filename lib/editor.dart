@@ -19,7 +19,7 @@ class EditorData implements Data {
             'elif' : HighlightData(TextStyle(color: theme.keyword)),
             'func' : HighlightData(TextStyle(color: theme.types)),
             'return' : HighlightData(TextStyle(color: theme.keyword)),
-            //'while' : HighlightData(TextStyle(color: theme.keyword)),
+            'while' : HighlightData(TextStyle(color: theme.keyword)),
             'null' : HighlightData(TextStyle(color: theme.keyword)),
             'false' : HighlightData(TextStyle(color: theme.types)),
             'true' : HighlightData(TextStyle(color: theme.types)),
