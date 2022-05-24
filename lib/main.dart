@@ -1,11 +1,17 @@
 // dart
 import 'dart:async';
+import 'dart:io';
+import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
 
 // packages
 import 'package:flutter/material.dart';
 import 'package:docking/docking.dart';
 import 'package:tabbed_view/tabbed_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:window_size/window_size.dart';
+
 
 // app 
 import 'themeprovider.dart';
@@ -22,7 +28,7 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return const MyHomePage(title: 'Some Cool Editor Thingy');
+    return const MyHomePage(title: 'Insert Language Name Editor');
   }
 }
 
@@ -60,6 +66,9 @@ class _MyHomePageState extends State<MyHomePage> {
     ThemeProvider theme = ThemeProvider.provider;
     EditorData data = EditorData();
     final Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
+    String consoleOutput = "";
+    String? fileDirectory = "";
+    String fileName = "";
 
     @override
     void initState() {
@@ -68,6 +77,7 @@ class _MyHomePageState extends State<MyHomePage> {
             setState((){ 
                 theme.init(prefs); 
                 data.init(prefs);
+                data.controller.text = "";
             });
         });
     }
@@ -80,6 +90,8 @@ class _MyHomePageState extends State<MyHomePage> {
         // The Flutter framework has been optimized to make rerunning build methods
         // fast, so that you can just rebuild anything that needs updating rather
         // than having to individually change instances of widgets.
+        setWindowTitle("Custom window title");
+
         return 
             MaterialApp(
                 debugShowCheckedModeBanner: false,
@@ -98,22 +110,127 @@ class _MyHomePageState extends State<MyHomePage> {
                                         });
                                     });
                                 }
-                            )
-                        ]
-                    ),
-                    body: TabbedViewTheme(
-                        data: theme.tabbedView,
+                            ),
+                            IconButton(
+                                icon: const Icon(Icons.upload_file),
+                                onPressed: () async { 
+                                    final result = await FilePicker.platform.pickFiles();
 
-                        child: //Container(
-                            // padding: const EdgeInsets.all(16),
-                            /* child: */ Docking(
-                                layout: DockingLayout(root: DockingRow([EditorWindow(widget: widget, data: data), FlowChartView(widget)]))
-                            )
-                        // )
+                                    if ( result != null)
+                                    {
+                                        PlatformFile platformFile = result.files.first;
+
+                                        fileDirectory = platformFile.path;
+                                        //fileDirectory = fileDirectory!.replaceAll('\\','/');
+                                        // Subtract the file name from the file directory
+                                        for (var i = 0; i < fileDirectory!.length; i++) {
+                                            if ( fileDirectory![fileDirectory!.length - i - 1] == '\\')
+                                            {
+                                                fileDirectory = fileDirectory!.substring(0, fileDirectory!.length - i - 1);
+                                                break;
+                                            }
+                                        }
+                                        // Set the file name
+                                        fileName = platformFile.name;
+                                        // Set the current directory to the directory of the file
+                                        if ( Directory.current != fileDirectory)
+                                        {
+                                            Directory.current = fileDirectory;
+                                        }
+                                        // Open the file
+                                        File file = File(fileName);
+                                        // Get the contents of the file
+                                        final contents = await file.readAsString();
+                                        
+                                        // Set the Editor contents
+                                        data.controller.text = contents;
+                                        setState(() { 
+                                        SharedPreferences.getInstance().then((value) {
+                                            data.save(value);
+                                        });
+                                    });
+                                    }
+                                }
+                            ),
+                            IconButton(
+                                icon: const Icon(Icons.save),
+                                onPressed: () async
+                                { 
+                                    if ( fileName != "")
+                                    {
+                                        if ( Directory.current != fileDirectory)
+                                        {
+                                            Directory.current = fileDirectory;
+                                        }
+                                        // Open the file
+                                        File file = File(fileName);
+                                        await file.writeAsString(data.controller.text);
+                                    }
+                                    
+
+                                }
+                            ),
+                            FlatButton(  
+                                child: Text('Compile', style: TextStyle(fontSize: 15.0, color: Colors.white)),
+                                onPressed: () {}
+                            ),
+                            FlatButton(  
+                                child: Text('Run', style: TextStyle(fontSize: 15.0, color: Colors.white),),  
+                                onPressed: () async {
+                                    if ( fileName != "")
+                                    {
+                                        // First save the contents to the file
+                                        if ( Directory.current != fileDirectory)
+                                        {
+                                            Directory.current = fileDirectory;
+                                        }
+                                        // Open the file
+                                        File workingFile = File(fileName);
+                                        await workingFile.writeAsString(data.controller.text);
+
+                                        // The directories will be replaced with pychart code directory such as compiler/pychart etc.
+                                        Directory.current = new Directory('D:/Bilkent/2021-2022 Spring (RUC)/Courses/Subject Module In Computer Science/Code/pychart');
+                                        final Directory directory = await getApplicationDocumentsDirectory();
+                                        final File file = File('D:/Bilkent/2021-2022 Spring (RUC)/Courses/Subject Module In Computer Science/Code/pychart/test.pych');
+                                        await file.writeAsString(data.controller.text);
+                                        var result = await Process.run('python', ['main.py', 'test.pych']);
+                                        consoleOutput = result.stdout;
+                                        setState(() { 
+                                            SharedPreferences.getInstance().then((value){
+                                                data.save(value);
+                                            });
+                                        });
+                                    }
+                                }) 
+                        ],
+                        bottom: PreferredSize ( child: Container (child:Text('Opened file: ' + fileName, style: TextStyle(fontWeight: FontWeight.bold, color:Colors.white))), preferredSize: Size.fromHeight(4.0))
+                    ),
+                    body: Container (
+                        decoration: new BoxDecoration(
+                            shape: BoxShape.rectangle,
+                            border: new Border.all(
+                            color: theme.material.primaryColorLight,
+                            width: 12.0,
+                            ),
+                        ),
+                        child: EditorWidget(data:data)
+                    ),
+                    bottomSheet: Container(
+                        decoration: new BoxDecoration(
+                            shape: BoxShape.rectangle,
+                            border: new Border.all(
+                            color: theme.material.primaryColorLight,
+                            width: 12.0,
+                            ),
+                        ),
+                        child: Text('Console Output:\n' + consoleOutput), 
+                        //color: Colors.grey[850],
+                        height: 200,
+                        width: double.infinity
                     )
                 )
             );
-  }
+    }
 }
 
 
