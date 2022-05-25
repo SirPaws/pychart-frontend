@@ -103,8 +103,6 @@ class CallAction extends Action {
 class EditorState extends State<EditorWidget> {
     final FocusNode node = FocusNode(skipTraversal: true);
 
-    _max(a, b) { return a < b ? a : b; }
-
     @override
     Widget build(BuildContext context) {
         SharedPreferences.getInstance().then((value){
@@ -121,7 +119,6 @@ class EditorState extends State<EditorWidget> {
                 shortcuts: { 
                     LogicalKeySet(LogicalKeyboardKey.tab):  
                         CallIntent((){ 
-                            final max = _max;
                             var controller = widget.data.controller;
                             String insert = "   ";
                             final int cursorPos = controller.selection.base.offset;

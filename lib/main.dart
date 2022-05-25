@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 
 // packages
 import 'package:flutter/material.dart';
@@ -19,7 +20,7 @@ import 'editor.dart';
 import 'flowchart.dart';
 
 void main() {
-  runApp(const MyApp());
+    runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -61,16 +62,28 @@ class DockingSpace extends DockingParentArea {
     DockingAreaType get type => DockingAreaType.item;
 }
 
+class PychartFile {
+    String name;
+    String directoryPath;
+    File file;
+
+    PychartFile({required this.name, required this.directoryPath, required this.file});
+
+    Future<File> write(String s) async {
+        return file.writeAsString(s);
+    }
+}
+
 
 class _MyHomePageState extends State<MyHomePage> {
     ThemeProvider theme = ThemeProvider.provider;
     EditorData data = EditorData();
     final Future<SharedPreferences> _prefs = SharedPreferences.getInstance();
-    String consoleOutput = "";
-    String? fileDirectory = "";
-    String fileName = "";
-    final _scaffoldKey = new GlobalKey<ScaffoldState>();
-    
+    final _scaffoldKey = GlobalKey<ScaffoldMessengerState>();
+    String? programOutput = "";
+    String? programErrors = "";
+    PychartFile ?currentFile;
+    bool compileAsBytecode = false;
 
     @override
     void initState() {
@@ -80,8 +93,124 @@ class _MyHomePageState extends State<MyHomePage> {
                 theme.init(prefs); 
                 data.init(prefs);
                 data.controller.text = "// Write your code here";
+                compileAsBytecode = prefs.getBool('compile_as_bytecode') ?? false;
             });
         });
+    }
+
+    get output => Text(
+        programOutput ?? (programErrors ?? ""),
+        style: programErrors == null ? null: const TextStyle(color: Colors.red)
+    );
+
+    String getDirectoryFromFilePath(String path) {
+        var i = path.length - 1;
+        while (!(path[i] == '\\' || path[i] == '/') && i >= 0) {
+            i--;
+        }
+        return path.substring(0, i == -1 ? 0 : i);
+    }
+
+    void onOpen() async {
+        String? fileDirectory = "";
+        String fileName = "";
+        // If no file is selected, opens file explorer
+        final result = await FilePicker.platform.pickFiles();
+        if (result == null) return;
+
+        PlatformFile platformFile = result.files.first;
+
+        if ( platformFile.extension == 'pych')
+        {
+            fileDirectory = getDirectoryFromFilePath(platformFile.path ?? "${Directory.current}/");
+            fileName = platformFile.name;
+
+            // Open the file
+            currentFile = PychartFile(
+                    name: fileName,
+                    directoryPath: fileDirectory,
+                    file: File(platformFile.path!));
+            // Save the contents to the file
+            await currentFile!.write(data.controller.text);
+
+            setState(() { 
+                    SharedPreferences.getInstance().then((value) {
+                        data.save(value);
+                        });
+                    });
+
+            const snackBar = SnackBar(
+                    content: Text('File saved successfuly', style: TextStyle(fontSize: 15.0, color: Colors.white)),
+                    duration: Duration(seconds: 2), backgroundColor: Colors.green);
+            _scaffoldKey.currentState!.showSnackBar(snackBar);
+        }
+        else
+        {
+            const snackBar = SnackBar(
+                    content: Text('Error: File extension must be .pych', style: TextStyle(fontSize: 15.0, color: Colors.white)),
+                    duration: Duration(seconds: 2), backgroundColor: Colors.red);
+            _scaffoldKey.currentState!.showSnackBar(snackBar);
+        }
+    }
+
+    void onSave() async {
+        if (currentFile != null) {
+            await currentFile!.write(data.controller.text);
+
+            const snackBar = SnackBar(
+                content: Text('File saved successfully', style: TextStyle(fontSize: 15.0, color: Colors.white)), 
+                duration: Duration(seconds: 2), backgroundColor: Colors.green);
+            _scaffoldKey.currentState?.showSnackBar(snackBar);
+        } else {
+            onOpen();
+        }
+    }
+
+    void onRun() async {
+        if (currentFile != null) {
+            await currentFile!.write(data.controller.text);
+        }
+        final text = data.controller.text;
+        if (kDebugMode) {
+            print("\n$text");
+        }
+
+        List<String> args = ['pychart/main.py'];
+        if (compileAsBytecode) args.add('--bytecode');
+        args.addAll(['-run', text]);
+
+        final result = await Process.run('./python/python.exe', args);
+
+        if (kDebugMode) {
+            var s = "\nRan program (python";
+            for (final arg in args) {
+                if (arg.contains('\n')) { 
+                    s += " \$contents";
+                    continue;
+                }
+                s += " $arg";
+            }
+            s += "):\n";
+            s += "$text\n";
+            s += "and got output:\n";
+            s += "${result.stdout}";
+            s += "with errors:\n";
+            s += "${result.stderr}";
+
+            print(s);
+        }
+        if (result.stdout != "") {
+            programOutput = result.stdout;
+            programErrors = null;
+        } else if (result.stderr != "") {
+            programErrors = result.stderr;
+            programOutput = null;
+        }
+        setState(() { 
+                SharedPreferences.getInstance().then((value){
+                        data.save(value);
+                        });
+                });
     }
 
     @override
@@ -96,187 +225,69 @@ class _MyHomePageState extends State<MyHomePage> {
 
         return 
             MaterialApp(
+                scaffoldMessengerKey: _scaffoldKey,
                 debugShowCheckedModeBanner: false,
                 theme: theme.material,
                 home: Scaffold(
-                    key: _scaffoldKey,
                     //resizeToAvoidBottomInset: false,
                     appBar: AppBar(
                         title: Text(widget.title),
                         actions: [
-                            IconButton(
-                                icon: const Icon(Icons.dark_mode),
-                                onPressed: () { 
+                            PopupMenuButton( 
+                                icon: const Icon(Icons.settings),
+                                onSelected: (int n){ 
                                     setState(() { 
-                                        theme.toggle();
-                                        SharedPreferences.getInstance().then((value){
-                                            theme.save(value);
+                                        SharedPreferences.getInstance().then((prefs){
+                                            compileAsBytecode = !compileAsBytecode;
+                                            prefs.setBool('compile_as_bytecode', compileAsBytecode);
                                         });
                                     });
-                                }
+                                },
+                                itemBuilder: (BuildContext ctx) => <PopupMenuEntry<int>>[
+                                    CheckedPopupMenuItem<int>(
+                                        checked: compileAsBytecode,
+                                        value: 0,
+                                        child: const Text("Compile as bytecode"),
+                                    )
+                                ]
                             ),
-                            IconButton(
-                                icon: const Icon(Icons.upload_file),
-                                onPressed: () async { 
-                                    final result = await FilePicker.platform.pickFiles();
-
-                                    if ( result != null)
-                                    {
-                                        PlatformFile platformFile = result.files.first;
-
-                                        if ( platformFile.extension == 'pych')
-                                        {
-                                            fileDirectory = platformFile.path;
-                                            //fileDirectory = fileDirectory!.replaceAll('\\','/');
-                                            // Subtract the file name from the file directory
-                                            for (var i = 0; i < fileDirectory!.length; i++) {
-                                                if ( fileDirectory![fileDirectory!.length - i - 1] == '\\')
-                                                {
-                                                    fileDirectory = fileDirectory!.substring(0, fileDirectory!.length - i - 1);
-                                                    break;
-                                                }
-                                            }
-                                            // Set the file name
-                                            fileName = platformFile.name;
-                                            // Set the current directory to the directory of the file
-                                            if ( Directory.current != fileDirectory)
-                                            {
-                                                Directory.current = fileDirectory;
-                                            }
-                                            // Open the file
-                                            File file = File(fileName);
-                                            // Get the contents of the file
-                                            final contents = await file.readAsString();
-                                            
-                                            // Set the Editor contents
-                                            data.controller.text = contents;
-                                            setState(() { 
-                                                SharedPreferences.getInstance().then((value) {
-                                                data.save(value);
-                                                });
-                                            });
-
-                                            final snackBar = SnackBar(content: new Text('File uploaded successfuly', style: TextStyle(fontSize: 15.0, color: Colors.white)), duration: new Duration(seconds: 2), backgroundColor: Colors.green);
-                                            _scaffoldKey.currentState!.showSnackBar(snackBar);
-                                        }
-                                        else
-                                        {
-                                            final snackBar = SnackBar(content: new Text('Error: File extension must be .pych', style: TextStyle(fontSize: 15.0, color: Colors.white)), duration: new Duration(seconds: 2), backgroundColor: Colors.red);
-                                            _scaffoldKey.currentState!.showSnackBar(snackBar);
-                                        }
-                                    }
-                                }
-                            ),
-                            IconButton(
-                                icon: const Icon(Icons.save),
-                                onPressed: () async
-                                { 
-                                    if ( fileName != "")
-                                    {
-                                        if ( Directory.current != fileDirectory)
-                                        {
-                                            Directory.current = fileDirectory;
-                                        }
-                                        // Open the file
-                                        File file = File(fileName);
-                                        await file.writeAsString(data.controller.text);
-
-                                        final snackBar = SnackBar(content: new Text('File saved successfully', style: TextStyle(fontSize: 15.0, color: Colors.white)), duration: new Duration(seconds: 2), backgroundColor: Colors.green);
-                                        _scaffoldKey.currentState!.showSnackBar(snackBar);
-                                    }
-                                    // If no file is selected, opens file explorer
-                                    else
-                                    {
-                                        final result = await FilePicker.platform.pickFiles();
-
-                                        if ( result != null)
-                                        {
-                                            PlatformFile platformFile = result.files.first;
-
-                                            if ( platformFile.extension == 'pych')
-                                            {
-                                                fileDirectory = platformFile.path;
-                                                //fileDirectory = fileDirectory!.replaceAll('\\','/');
-                                                // Subtract the file name from the file directory
-                                                for (var i = 0; i < fileDirectory!.length; i++) {
-                                                    if ( fileDirectory![fileDirectory!.length - i - 1] == '\\')
-                                                    {
-                                                        fileDirectory = fileDirectory!.substring(0, fileDirectory!.length - i - 1);
-                                                        break;
-                                                    }
-                                                }
-                                                // Set the file name
-                                                fileName = platformFile.name;
-                                                // Set the current directory to the directory of the file
-                                                if ( Directory.current != fileDirectory)
-                                                {
-                                                    Directory.current = fileDirectory;
-                                                }
-                                                // Open the file
-                                                File file = File(fileName);
-                                                // Save the contents to the file
-                                                await file.writeAsString(data.controller.text);
-                                                
-                                                setState(() { 
-                                                    SharedPreferences.getInstance().then((value) {
-                                                    data.save(value);
-                                                    });
-                                                });
-
-                                                final snackBar = SnackBar(content: new Text('File saved successfuly', style: TextStyle(fontSize: 15.0, color: Colors.white)), duration: new Duration(seconds: 2), backgroundColor: Colors.green);
-                                                _scaffoldKey.currentState!.showSnackBar(snackBar);
-                                            }
-                                            else
-                                            {
-                                                final snackBar = SnackBar(content: new Text('Error: File extension must be .pych', style: TextStyle(fontSize: 15.0, color: Colors.white)), duration: new Duration(seconds: 2), backgroundColor: Colors.red);
-                                                _scaffoldKey.currentState!.showSnackBar(snackBar);
-                                            }
-                                        }
-
-                                        //final snackBar = SnackBar(content: new Text('Unable to save file', style: TextStyle(fontSize: 15.0, color: Colors.white)), duration: new Duration(seconds: 2), backgroundColor: Colors.red);
-                                        //_scaffoldKey.currentState!.showSnackBar(snackBar);
-                                    }
-                                } 
-                            ),
-                            FlatButton(  
-                                child: Text('Compile', style: TextStyle(fontSize: 15.0, color: Colors.white)),
-                                onPressed: () {}
-                            ),
-                            FlatButton(  
-                                child: Text('Run', style: TextStyle(fontSize: 15.0, color: Colors.white),),  
-                                onPressed: () async {
-                                    if ( fileName != "")
-                                    {
-                                        // First save the contents to the file
-                                        if ( Directory.current != fileDirectory)
-                                        {
-                                            Directory.current = fileDirectory;
-                                        }
-                                        // Open the file
-                                        File workingFile = File(fileName);
-                                        await workingFile.writeAsString(data.controller.text);
-
-                                        // The directories will be replaced with pychart code directory such as compiler/pychart etc.
-                                        Directory.current = new Directory('D:/Bilkent/2021-2022 Spring (RUC)/Courses/Subject Module In Computer Science/Code/pychart');
-                                        final Directory directory = await getApplicationDocumentsDirectory();
-                                        final File file = File('D:/Bilkent/2021-2022 Spring (RUC)/Courses/Subject Module In Computer Science/Code/pychart/test.pych');
-                                        await file.writeAsString(data.controller.text);
-                                        var result = await Process.run('python', ['main.py', 'test.pych']);
-                                        consoleOutput = result.stdout;
+                            Tooltip( 
+                                message: theme.isDarkMode ? 'light mode' : 'dark mode', 
+                                child: IconButton(
+                                    icon: const Icon(Icons.dark_mode),
+                                    onPressed: () { 
                                         setState(() { 
+                                            theme.toggle();
                                             SharedPreferences.getInstance().then((value){
-                                                data.save(value);
+                                                theme.save(value);
                                             });
                                         });
                                     }
-                                    else
-                                    {
-                                        final snackBar = SnackBar(content: new Text('Error: Please upload a file to run', style: TextStyle(fontSize: 15.0, color: Colors.white)), duration: new Duration(seconds: 2), backgroundColor: Colors.red);
-                                        _scaffoldKey.currentState!.showSnackBar(snackBar);
-                                    }
-                                }) 
+                                )
+                            ),
+                            Tooltip( 
+                                message: 'open', 
+                                child: IconButton(
+                                    icon: const Icon(Icons.upload_file),
+                                    onPressed: onOpen
+                                ),
+                            ),
+                            Tooltip( 
+                                message: 'save', 
+                                child: IconButton(
+                                    icon: const Icon(Icons.save),
+                                    onPressed: onSave
+                                )
+                            ),
+                            TextButton(  
+                                onPressed: onRun,
+                                child: const Text('Run', style: TextStyle(fontSize: 15.0, color: Colors.white))
+                            ) 
                         ],
-                        bottom: PreferredSize ( child: Container (child:Text('Opened file: ' + fileName, style: TextStyle(fontWeight: FontWeight.bold, color:Colors.white))), preferredSize: Size.fromHeight(4.0))
+                        bottom: PreferredSize ( 
+                            preferredSize: const Size.fromHeight(4.0),
+                            child: Text('Opened file: ${currentFile?.name ?? ""}', style: const TextStyle(fontWeight: FontWeight.bold, color:Colors.white))
+                        ),
                     ),
                     /*body: Container (
                         decoration: new BoxDecoration(
@@ -307,27 +318,27 @@ class _MyHomePageState extends State<MyHomePage> {
                         width: double.infinity
                     ) */
                     body: SingleChildScrollView ( // to get rid of bottom overflow by x pixels error
-                        child:Column (
+                        child: Column (
                             mainAxisSize: MainAxisSize.max,
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                                 Container (
-                                    padding: EdgeInsets.all(10.0),
-                                    width:double.infinity,
-                                    child:EditorWidget(data:data),
-                                    constraints: BoxConstraints(maxHeight: 400)
+                                    padding: const EdgeInsets.all(10.0),
+                                    width: double.infinity,
+                                    constraints: const BoxConstraints(maxHeight: 400),
+                                    child: EditorWidget(data: data)
                                 ),
                                 Container (
-                                    padding: EdgeInsets.all(10.0),
-                                    constraints: BoxConstraints(maxHeight: 250),
+                                    padding: const EdgeInsets.all(10.0),
+                                    constraints: const BoxConstraints(maxHeight: 250),
                                     width:double.infinity,
                                     child: SingleChildScrollView(
                                         scrollDirection: Axis.vertical,
                                         child: Column (
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children:<Widget>[
-                                            Text('Console Output:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                            Text(consoleOutput)
+                                            const Text('Console Output:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                            output
                                         ],)
                                     )
                                 ) 
