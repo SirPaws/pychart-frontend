@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:tabbed_view/tabbed_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'data.dart';
@@ -29,7 +28,7 @@ class ThemeProvider implements Data {
     }
 
     ThemeData get material             => isDarkMode ? Themes.materialDark   : Themes.materialLight;
-    TabbedViewThemeData get tabbedView => isDarkMode ? Themes.tabbedViewDark : Themes.tabbedViewLight; 
+    // TabbedViewThemeData get tabbedView => isDarkMode ? Themes.tabbedViewDark : Themes.tabbedViewLight; 
     CodeTheme get code                 => isDarkMode ? Themes.codeDracula    : Themes.codeLight;
 }
 
@@ -65,9 +64,9 @@ class Themes {
     static final materialDark  = ThemeData.dark();
     static final materialLight = ThemeData.light();
     
-    static final tabbedViewLight = TabbedViewThemeData.mobile();
+    // static final tabbedViewLight = TabbedViewThemeData.mobile();
 
-    static final tabbedViewDark  = TabbedViewThemeData.mobile(colorSet: themeToMaterialColor(codeDracula));
+    // static final tabbedViewDark  = TabbedViewThemeData.mobile(colorSet: themeToMaterialColor(codeDracula));
 
     static final codeDracula = CodeTheme(
         keyword     : const Color(0xFFFF79C6),

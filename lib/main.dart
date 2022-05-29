@@ -8,17 +8,15 @@ import 'package:flutter/foundation.dart';
 // packages
 import 'package:flutter/material.dart';
 import 'package:docking/docking.dart';
-import 'package:tabbed_view/tabbed_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:window_size/window_size.dart';
 
 
 // app 
 import 'themeprovider.dart';
 import 'editor.dart';
-import 'flowchart.dart';
 
+typedef StreamBuilderFunc = Widget Function(BuildContext context, AsyncSnapshot<List<int>> snapshot);
 void main() {
     runApp(const MyApp());
 }
@@ -84,6 +82,9 @@ class _MyHomePageState extends State<MyHomePage> {
     String? programErrors = "";
     PychartFile ?currentFile;
     bool compileAsBytecode = false;
+    Process? process;
+
+    List<Text> consoleOutput = [];
 
     @override
     void initState() {
@@ -98,10 +99,20 @@ class _MyHomePageState extends State<MyHomePage> {
         });
     }
 
-    get output => Text(
-        programOutput ?? (programErrors ?? ""),
-        style: programErrors == null ? null: const TextStyle(color: Colors.red)
-    );
+    StreamBuilderFunc makeStreamFunc({Color? color}) {
+        return (BuildContext context, AsyncSnapshot<List<int>> snapshot) {
+            if (!snapshot.hasData) return const Text("");
+
+            if (snapshot.connectionState == ConnectionState.active ||
+                snapshot.connectionState == ConnectionState.done)
+            {
+                List<int> list = snapshot.data!;
+                var result = utf8.decode(list);
+                return Text(result, style: TextStyle(color: color));
+            }
+            return const Text("");
+        };
+    }
 
     String getDirectoryFromFilePath(String path) {
         var i = path.length - 1;
@@ -110,15 +121,24 @@ class _MyHomePageState extends State<MyHomePage> {
         }
         return path.substring(0, i == -1 ? 0 : i);
     }
+    String getFileNameFromFilePath(String path) {
+        var i = path.length - 1;
+        while (!(path[i] == '\\' || path[i] == '/') && i >= 0) {
+            i--;
+        }
+        return path.substring( i == -1 ? 0 : i + 1, path.length);
+    }
 
     void onOpen() async {
         String? fileDirectory = "";
         String fileName = "";
         // If no file is selected, opens file explorer
-        final result = await FilePicker.platform.pickFiles();
+        var current = Directory.current;
+        final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['pych']);
         if (result == null) return;
 
         PlatformFile platformFile = result.files.first;
+        Directory.current = current;
 
         if ( platformFile.extension == 'pych')
         {
@@ -130,17 +150,19 @@ class _MyHomePageState extends State<MyHomePage> {
                     name: fileName,
                     directoryPath: fileDirectory,
                     file: File(platformFile.path!));
+            List<String> lines = await currentFile!.file.readAsLines();
+            data.controller.text = lines.reduce((result, next) => '$result\n$next');
             // Save the contents to the file
-            await currentFile!.write(data.controller.text);
+            // await currentFile!.write(data.controller.text);
 
-            setState(() { 
-                    SharedPreferences.getInstance().then((value) {
-                        data.save(value);
-                        });
-                    });
+            // setState(() { 
+            //         SharedPreferences.getInstance().then((value) {
+            //             data.save(value);
+            //             });
+            //         });
 
             const snackBar = SnackBar(
-                    content: Text('File saved successfuly', style: TextStyle(fontSize: 15.0, color: Colors.white)),
+                    content: Text('File opened successfuly', style: TextStyle(fontSize: 15.0, color: Colors.white)),
                     duration: Duration(seconds: 2), backgroundColor: Colors.green);
             _scaffoldKey.currentState!.showSnackBar(snackBar);
         }
@@ -162,7 +184,23 @@ class _MyHomePageState extends State<MyHomePage> {
                 duration: Duration(seconds: 2), backgroundColor: Colors.green);
             _scaffoldKey.currentState?.showSnackBar(snackBar);
         } else {
-            onOpen();
+        var current = Directory.current;
+            String? path = await FilePicker.platform.saveFile(fileName: 'main.pych', allowedExtensions: ['pych']);
+            if (path == null) return;
+            Directory.current = current;
+
+            final fileDirectory = getDirectoryFromFilePath(path);
+            final fileName      = getFileNameFromFilePath(path);
+
+            currentFile = PychartFile(
+                    name: fileName,
+                    directoryPath: fileDirectory,
+                    file: File(path));
+
+            const snackBar = SnackBar(
+                content: Text('File saved successfully', style: TextStyle(fontSize: 15.0, color: Colors.white)), 
+                duration: Duration(seconds: 2), backgroundColor: Colors.green);
+            _scaffoldKey.currentState?.showSnackBar(snackBar);
         }
     }
 
@@ -171,18 +209,11 @@ class _MyHomePageState extends State<MyHomePage> {
             await currentFile!.write(data.controller.text);
         }
         final text = data.controller.text;
-        if (kDebugMode) {
-            print("\n$text");
-        }
-
-        List<String> args = ['pychart/main.py'];
+        List<String> args = ['./pychart/main.py'];
         if (compileAsBytecode) args.add('--bytecode');
         args.addAll(['-run', text]);
-
-        final result = await Process.run('./python/python.exe', args);
-
         if (kDebugMode) {
-            var s = "\nRan program (python";
+        var s = "\nrunning program (python";
             for (final arg in args) {
                 if (arg.contains('\n')) { 
                     s += " \$contents";
@@ -192,20 +223,37 @@ class _MyHomePageState extends State<MyHomePage> {
             }
             s += "):\n";
             s += "$text\n";
-            s += "and got output:\n";
-            s += "${result.stdout}";
-            s += "with errors:\n";
-            s += "${result.stderr}";
-
             print(s);
         }
-        if (result.stdout != "") {
-            programOutput = result.stdout;
+
+        process = await Process.start('./python/python.exe', args);
+        consoleOutput.clear();
+        process!.stdout.listen((data) {
+            setState(() => {
+                consoleOutput.add(Text(utf8.decode(data)))
+            });
+        });
+        process!.stderr.listen((data) {
+            setState(() => {
+              consoleOutput.add(Text(utf8.decode(data), style: const TextStyle(color: Colors.red)))
+            });
+        });
+        process!.exitCode.whenComplete(
+          () => 
+            setState(() => {
+              process = null
+            })
+        );
+
+/*
+        if (process.stdout != "") {
+            programOutput = process.stdout;
             programErrors = null;
-        } else if (result.stderr != "") {
-            programErrors = result.stderr;
+        } else if (process.stderr != "") {
+            programErrors = process.stderr;
             programOutput = null;
         }
+*/
         setState(() { 
                 SharedPreferences.getInstance().then((value){
                         data.save(value);
@@ -338,8 +386,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children:<Widget>[
                                             const Text('Console Output:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                            output
-                                        ],)
+                                        // append consoleOutput
+                                        ] + consoleOutput)
                                     )
                                 ) 
                             ]
