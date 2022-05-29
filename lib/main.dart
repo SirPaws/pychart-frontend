@@ -277,7 +277,6 @@ class _MyHomePageState extends State<MyHomePage> {
                 debugShowCheckedModeBanner: false,
                 theme: theme.material,
                 home: Scaffold(
-                    //resizeToAvoidBottomInset: false,
                     appBar: AppBar(
                         title: Text(widget.title),
                         actions: [
@@ -337,36 +336,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             child: Text('Opened file: ${currentFile?.name ?? ""}', style: const TextStyle(fontWeight: FontWeight.bold, color:Colors.white))
                         ),
                     ),
-                    /*body: Container (
-                        decoration: new BoxDecoration(
-                            shape: BoxShape.rectangle,
-                            border: new Border.all(
-                            color: theme.material.primaryColorLight,
-                            width: 12.0,
-                            ),
-                        ),
-                        child: EditorWidget(data:data)
-                    ), 
-                    bottomSheet: Container(
-                        decoration: new BoxDecoration(
-                            shape: BoxShape.rectangle,
-                            border: new Border.all(
-                            color: theme.material.primaryColorLight,
-                            width: 12.0,
-                            ),
-                        ),
-                        constraints: BoxConstraints(maxHeight: 175),
-                        child: SingleChildScrollView(
-                            scrollDirection: Axis.vertical,
-                            child: Text('Console Output:\n' + consoleOutput)
-                        ),
-                        //child: Text('Console Output:\n' + consoleOutput), 
-                        //color: Colors.grey[850],
-                        height: 175,
-                        width: double.infinity
-                    ) */
-                    body: SingleChildScrollView ( // to get rid of bottom overflow by x pixels error
-                        child: Column (
+                    body: Column (
                             mainAxisSize: MainAxisSize.max,
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
@@ -376,48 +346,22 @@ class _MyHomePageState extends State<MyHomePage> {
                                     constraints: const BoxConstraints(maxHeight: 400),
                                     child: EditorWidget(data: data)
                                 ),
-                                Container (
-                                    padding: const EdgeInsets.all(10.0),
-                                    constraints: const BoxConstraints(maxHeight: 250),
-                                    width:double.infinity,
-                                    child: SingleChildScrollView(
-                                        scrollDirection: Axis.vertical,
-                                        child: Column (
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children:<Widget>[
+                                Flexible(
+                                    flex: 25,
+                                    fit: FlexFit.loose,
+                                    child: Container (
+                                        padding: const EdgeInsets.all(10.0),
+                                        constraints: const BoxConstraints(maxHeight: 300),
+                                        width:double.infinity,
+                                        child: ListView(
+                                            scrollDirection: Axis.vertical,
+                                            children: <Widget>[
                                             const Text('Console Output:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                        // append consoleOutput
-                                        ] + consoleOutput)
-                                    )
-                                ) 
-                            ]
-                        )
-                    )
-                    /*Container (
-                        child: Column (
-                            children: [
-                                Container (
-                                    //margin: const EdgeInsets.only(bottom: 250.0),
-                                    //constraints: BoxConstraints(minHeight: 700, maxHeight: 700),
-                                    //alignment: Alignment.topCenter,	
-                                    child: EditorWidget(data:data),
-                                    //height: 700,
-                                ),
-                                Container(
-                                    //padding: const EdgeInsets.only(top: 25.0),
-                                    //margin: const EdgeInsets.only(top: 250.0),
-                                    //alignment: Alignment.topLeft,
-                                    //constraints: BoxConstraints(minHeight: 300, maxHeight: 300),
-                                    child: SingleChildScrollView(
-                                        scrollDirection: Axis.vertical,
-                                        child: Text('Console Output:\n' + consoleOutput)
-                                    ),
-                                    //height: 300,
-                                    //width: double.infinity
+                                            // append consoleOutput
+                                        ] + consoleOutput))
                                 )
                             ]
                         )
-                    )*/
                 )
             );
     }
