@@ -1,16 +1,10 @@
-# myapp
+# WIP
+## Installing Python
+Python is a very common programming language and it comes readily installed on many systems including many Linux distributions, and Mac, but we have packaged a python runtime with our IDE, so no additional installation is necessary (?)
+	
 
-A new Flutter project.
+## Installing Flutter
+Installation of Flutter was necessary for coding the Integrated Development Environment. Flutter’s official guide on how to install was simple and easy to follow. Here is the link to the official installation guide that we have used: https://docs.flutter.dev/get-started/install. After downloading and installing Flutter however, there was one more necessary step in order to run Flutter on Desktop.
 
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Installing Desktop Support Requirements
+The Flutter app will run on browser right now however, the backend which is the Python code for the language interpreter is synchronised for only Desktop usage hence, it was mandatory to install the desktop support requirements for Flutter. Here is a link that we used for setting up the Desktop support: https://docs.flutter.dev/desktop.
